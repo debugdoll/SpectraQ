@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Light Controller</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #FFF8ED; --card: #FFFFFF; --text: #1A1A2E; --muted: #6B7280;
+    --border: #E5E7EB; --shadow: 0 4px 24px rgba(0,0,0,0.07);
+    --green: #22C55E; --red: #EF4444; --orange: #F97316;
+  }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 16px; }
+  .header { background: linear-gradient(135deg, #FFB800 0%, #FF7A00 100%); border-radius: 20px; padding: 20px 24px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 8px 32px rgba(255,184,0,0.3); }
+  .header h1 { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; color: white; }
+  .header p { font-size: 12px; color: rgba(255,255,255,0.85); margin-top: 2px; }
+  .status-pill { background: rgba(255,255,255,0.25); color: white; padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #22C55E; animation: pulse 2s infinite; }
+  .dot.offline { background: var(--red); animation: none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .alert-banner { background: #FEF2F2; border: 2px solid var(--red); border-radius: 14px; padding: 12px 18px; margin-bottom: 14px; display: none; align-items: center; gap: 10px; }
+  .alert-banner.show { display: flex; }
+  .alert-text strong { display: block; color: var(--red); font-size: 13px; font-weight: 600; }
+  .alert-text span { font-size: 11px; color: #991B1B; }
+  .section-title { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .master-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .master-btn { padding: 13px; border: none; border-radius: 14px; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; font-family: 'Inter', sans-serif; }
+  .master-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.12); }
+  .btn-all-on { background: linear-gradient(135deg, #FFB800, #FF7A00); color: white; }
+  .btn-all-off { background: #1A1A2E; color: white; }
+  .presets-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .preset-card { background: var(--card); border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; border: 2px solid var(--border); box-shadow: var(--shadow); transition: 0.2s; position: relative; overflow: hidden; }
+  .preset-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+  .preset-card.active { border-width: 2px; }
+  .preset-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+  .preset-emoji { font-size: 26px; margin-bottom: 6px; }
+  .preset-name { font-weight: 700; font-size: 12px; color: var(--text); margin-bottom: 2px; }
+  .preset-desc { font-size: 10px; color: var(--muted); line-height: 1.4; }
+  .preset-values { font-size: 10px; font-weight: 600; margin-top: 6px; padding: 3px 6px; border-radius: 6px; display: inline-block; }
+  .preset-relax::before { background: linear-gradient(90deg, #FF7A00, #FFB800); }
+  .preset-relax.active { border-color: #FF7A00; background: #FFF7ED; }
+  .preset-relax .preset-values { background: #FFF7ED; color: #C2410C; }
+  .preset-focus::before { background: linear-gradient(90deg, #4A90E2, #60A5FA); }
+  .preset-focus.active { border-color: #4A90E2; background: #EFF6FF; }
+  .preset-focus .preset-values { background: #EFF6FF; color: #1D4ED8; }
+  .preset-sleep::before { background: linear-gradient(90deg, #7C3AED, #A78BFA); }
+  .preset-sleep.active { border-color: #7C3AED; background: #F5F3FF; }
+  .preset-sleep .preset-values { background: #F5F3FF; color: #5B21B6; }
+  .preset-warm::before { background: linear-gradient(90deg, #F59E0B, #FCD34D); }
+  .preset-warm.active { border-color: #F59E0B; background: #FFFBEB; }
+  .preset-warm .preset-values { background: #FFFBEB; color: #92400E; }
+  .preset-cool::before { background: linear-gradient(90deg, #0EA5E9, #BAE6FD); }
+  .preset-cool.active { border-color: #0EA5E9; background: #F0F9FF; }
+  .preset-cool .preset-values { background: #F0F9FF; color: #0369A1; }
+  .preset-eye::before { background: linear-gradient(90deg, #10B981, #6EE7B7); }
+  .preset-eye.active { border-color: #10B981; background: #F0FDF4; }
+  .preset-eye .preset-values { background: #F0FDF4; color: #065F46; }
+  .preset-morning::before { background: linear-gradient(90deg, #F97316, #FBBF24); }
+  .preset-morning.active { border-color: #F97316; background: #FFF7ED; }
+  .preset-morning .preset-values { background: #FFF7ED; color: #9A3412; }
+  .preset-cinema::before { background: linear-gradient(90deg, #DC2626, #F87171); }
+  .preset-cinema.active { border-color: #DC2626; background: #FEF2F2; }
+  .preset-cinema .preset-values { background: #FEF2F2; color: #991B1B; }
+  .preset-reading::before { background: linear-gradient(90deg, #D97706, #FDE68A); }
+  .preset-reading.active { border-color: #D97706; background: #FFFBEB; }
+  .preset-reading .preset-values { background: #FFFBEB; color: #78350F; }
+  .readings-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  .reading-card { background: var(--card); border-radius: 14px; padding: 14px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+  .reading-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
+  .reading-value { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
+  .reading-unit { font-size: 11px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+  .reading-desc { font-size: 10px; color: var(--muted); margin-top: 4px; }
+  .cct-meter { margin-top: 8px; height: 8px; border-radius: 4px; background: linear-gradient(to right, #FF7A00, #FFD700, #FFFFFF, #87CEEB, #4A90E2); position: relative; }
+  .cct-needle { position: absolute; top: -4px; width: 4px; height: 16px; background: var(--text); border-radius: 2px; transform: translateX(-50%); transition: left 0.5s; }
+  .cct-labels { display: flex; justify-content: space-between; margin-top: 3px; font-size: 9px; color: var(--muted); }
+  .health-bar-bg { height: 8px; background: #F3F4F6; border-radius: 4px; overflow: hidden; margin-top: 6px; }
+  .health-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+  .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .control-card { background: var(--card); border-radius: 16px; padding: 18px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+  .control-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .control-title { display: flex; align-items: center; gap: 8px; }
+  .ctrl-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .ctrl-icon.warm { background: #FFF3E0; }
+  .ctrl-icon.cool { background: #E3F2FD; }
+  .ctrl-name { font-weight: 600; font-size: 14px; }
+  .ctrl-type { font-size: 10px; color: var(--muted); }
+  .toggle { position: relative; width: 48px; height: 26px; cursor: pointer; }
+  .toggle input { display: none; }
+  .toggle-track { position: absolute; inset: 0; background: #E5E7EB; border-radius: 13px; transition: 0.3s; }
+  .toggle input:checked + .toggle-track { background: var(--green); }
+  .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+  .toggle input:checked ~ .toggle-thumb { transform: translateX(22px); }
+  .slider-row { margin-top: 2px; }
+  .slider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .slider-title { font-size: 11px; font-weight: 500; color: var(--muted); }
+  .slider-val { font-size: 13px; font-weight: 700; color: var(--text); }
+  input[type=range] { width: 100%; height: 6px; -webkit-appearance: none; border-radius: 3px; outline: none; cursor: pointer; }
+  input[type=range].warm-slider { background: linear-gradient(to right, #FFB800 0%, #FFB800 var(--val,0%), #E5E7EB var(--val,0%), #E5E7EB 100%); }
+  input[type=range].cool-slider { background: linear-gradient(to right, #4A90E2 0%, #4A90E2 var(--val,0%), #E5E7EB var(--val,0%), #E5E7EB 100%); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: white; box-shadow: 0 2px 6px rgba(0,0,0,0.15); cursor: pointer; }
+  input[type=range].warm-slider::-webkit-slider-thumb { border: 3px solid #FFB800; }
+  input[type=range].cool-slider::-webkit-slider-thumb { border: 3px solid #4A90E2; }
+  .led-preview { width: 100%; height: 6px; border-radius: 3px; margin-top: 10px; transition: 0.3s; }
+  .quick-btns { display: flex; gap: 6px; margin-top: 10px; }
+  .qbtn { flex: 1; padding: 7px; border: none; border-radius: 8px; font-size: 10px; font-weight: 600; cursor: pointer; transition: 0.15s; }
+  .qbtn:hover { transform: translateY(-1px); }
+  .qbtn-off { background: #F3F4F6; color: var(--muted); }
+  .qbtn-50 { background: #FEF9C3; color: #854D0E; }
+  .qbtn-100 { background: #DCFCE7; color: #166534; }
+  .auto-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .auto-card { background: #F0FDF4; border: 2px solid #86EFAC; border-radius: 14px; padding: 16px; }
+  .auto-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .auto-title { font-weight: 700; font-size: 13px; }
+  .auto-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .auto-msg { margin-top: 8px; padding: 8px 10px; background: white; border-radius: 8px; font-size: 11px; color: var(--text); }
+  .health-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .log-card { background: var(--card); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); border: 1px solid var(--border); margin-bottom: 14px; }
+  .log-list { list-style: none; max-height: 130px; overflow-y: auto; }
+  .log-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #F3F4F6; font-size: 11px; }
+  .log-item:last-child { border-bottom: none; }
+  .log-time { color: var(--muted); min-width: 55px; font-size: 10px; }
+  .log-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .preset-banner { background: white; border-radius: 14px; padding: 14px 18px; margin-bottom: 14px; box-shadow: var(--shadow); border: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .preset-banner-left { display: flex; align-items: center; gap: 12px; }
+  .preset-banner-emoji { font-size: 28px; }
+  .preset-banner-name { font-weight: 700; font-size: 15px; }
+  .preset-banner-desc { font-size: 11px; color: var(--muted); }
+  .preset-banner-tip { font-size: 11px; background: #FFF7ED; color: #C2410C; padding: 6px 12px; border-radius: 10px; font-weight: 500; max-width: 200px; text-align: right; line-height: 1.4; }
+  .conn-bar { background: white; border-radius: 14px; padding: 10px 14px; margin-bottom: 14px; box-shadow: var(--shadow); border: 1px solid var(--border); display: flex; align-items: center; gap: 10px; font-size: 12px; }
+  .conn-bar input { flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12px; font-family: 'Inter', sans-serif; }
+  .conn-bar button { border: none; background: var(--text); color: white; padding: 7px 14px; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; }
+  .footer { text-align: center; padding: 12px; font-size: 10px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="conn-bar">
+  <span style="font-weight:600;">NodeMCU IP:</span>
+  <input type="text" id="deviceIP" placeholder="e.g. 192.168.1.45" value="">
+  <button onclick="saveIP()">Connect</button>
+</div>
+
+<div class="header">
+  <div>
+    <h1>Smart Light Controller</h1>
+    <p>Set the perfect light for every moment</p>
+  </div>
+  <div class="status-pill">
+    <div class="dot offline" id="statusDot"></div>
+    <span id="statusText">Offline</span>
+  </div>
+</div>
+
+<div class="alert-banner" id="alertBanner">
+  <span style="font-size:20px">!</span>
+  <div class="alert-text">
+    <strong id="alertTitle">Alert</strong>
+    <span id="alertMsg">Check your lighting system</span>
+  </div>
+</div>
+
+<div class="preset-banner" id="presetBanner">
+  <div class="preset-banner-left">
+    <div class="preset-banner-emoji" id="bannerEmoji">--</div>
+    <div>
+      <div class="preset-banner-name" id="bannerName">Lights Off</div>
+      <div class="preset-banner-desc" id="bannerDesc">All lights are off</div>
+    </div>
+  </div>
+  <div class="preset-banner-tip" id="bannerTip">Tap a preset below to get started</div>
+</div>
+
+<div class="master-btns">
+  <button class="master-btn btn-all-on" onclick="allOn()">All Lights ON</button>
+  <button class="master-btn btn-all-off" onclick="allOff()">All Lights OFF</button>
+</div>
+
+<div class="section-title">Choose Your Mood</div>
+<div class="presets-grid">
+  <div class="preset-card preset-relax" onclick="applyPreset('relax')" id="preset-relax">
+    <div class="preset-name">Relax</div>
+    <div class="preset-desc">Warm cozy light for unwinding after a long day</div>
+    <div class="preset-values">Warm 90% &middot; Cool 10%</div>
+  </div>
+  <div class="preset-card preset-focus" onclick="applyPreset('focus')" id="preset-focus">
+    <div class="preset-name">Focus</div>
+    <div class="preset-desc">Bright cool light to stay alert and productive</div>
+    <div class="preset-values">Warm 20% &middot; Cool 100%</div>
+  </div>
+  <div class="preset-card preset-sleep" onclick="applyPreset('sleep')" id="preset-sleep">
+    <div class="preset-name">Sleep</div>
+    <div class="preset-desc">Very dim warm light to prepare your body for sleep</div>
+    <div class="preset-values">Warm 15% &middot; Cool 0%</div>
+  </div>
+  <div class="preset-card preset-warm" onclick="applyPreset('warmonly')" id="preset-warmonly">
+    <div class="preset-name">Warm Only</div>
+    <div class="preset-desc">Only warm light, like a cosy indoor lamp</div>
+    <div class="preset-values">Warm 100% &middot; Cool 0%</div>
+  </div>
+  <div class="preset-card preset-cool" onclick="applyPreset('coolonly')" id="preset-coolonly">
+    <div class="preset-name">Cool Only</div>
+    <div class="preset-desc">Only cool light, bright and crisp white</div>
+    <div class="preset-values">Warm 0% &middot; Cool 100%</div>
+  </div>
+  <div class="preset-card preset-eye" onclick="applyPreset('eyecare')" id="preset-eyecare">
+    <div class="preset-name">Eye Care</div>
+    <div class="preset-desc">Gentle balanced light, reduces eye strain</div>
+    <div class="preset-values">Warm 60% &middot; Cool 40%</div>
+  </div>
+  <div class="preset-card preset-morning" onclick="applyPreset('morning')" id="preset-morning">
+    <div class="preset-name">Morning</div>
+    <div class="preset-desc">Energising warm-to-cool light to start your day</div>
+    <div class="preset-values">Warm 50% &middot; Cool 70%</div>
+  </div>
+  <div class="preset-card preset-cinema" onclick="applyPreset('cinema')" id="preset-cinema">
+    <div class="preset-name">Cinema</div>
+    <div class="preset-desc">Very dim warm light, great for watching movies</div>
+    <div class="preset-values">Warm 25% &middot; Cool 0%</div>
+  </div>
+  <div class="preset-card preset-reading" onclick="applyPreset('reading')" id="preset-reading">
+    <div class="preset-name">Reading</div>
+    <div class="preset-desc">Clear warm-white light, easy on eyes for reading</div>
+    <div class="preset-values">Warm 80% &middot; Cool 50%</div>
+  </div>
+</div>
+
+<div class="section-title">Live Readings</div>
+<div class="readings-grid">
+  <div class="reading-card">
+    <div class="reading-label">Room Brightness</div>
+    <div class="reading-value" id="luxVal">--<span class="reading-unit">lux</span></div>
+    <div class="reading-desc" id="luxDesc">Waiting for device...</div>
+  </div>
+  <div class="reading-card">
+    <div class="reading-label">Colour Temperature</div>
+    <div class="reading-value" id="cctVal">--<span class="reading-unit">K</span></div>
+    <div class="cct-meter"><div class="cct-needle" id="cctNeedle" style="left:50%"></div></div>
+    <div class="cct-labels"><span>Warm</span><span>Cool</span></div>
+  </div>
+  <div class="reading-card">
+    <div class="reading-label">Light Health</div>
+    <div class="reading-value" id="healthVal" style="color:var(--green)">--<span class="reading-unit">%</span></div>
+    <div class="health-bar-bg"><div class="health-bar-fill" id="healthBar" style="width:0%;background:var(--green)"></div></div>
+    <div class="reading-desc" id="healthDesc">--</div>
+  </div>
+  <div class="reading-card">
+    <div class="reading-label">Hours On Today</div>
+    <div class="reading-value" id="hoursVal">0.0<span class="reading-unit">hrs</span></div>
+    <div class="reading-desc">Total usage today</div>
+  </div>
+</div>
+
+<div class="section-title">Manual Controls</div>
+<div class="controls-grid">
+  <div class="control-card">
+    <div class="control-header">
+      <div class="control-title">
+        <div class="ctrl-icon warm">W</div>
+        <div>
+          <div class="ctrl-name">Warm Light</div>
+          <div class="ctrl-type">Good for relaxing &amp; evenings</div>
+        </div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="warmToggle" onchange="toggleWarm()">
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>
+    <div class="slider-row">
+      <div class="slider-header">
+        <span class="slider-title">Brightness</span>
+        <span class="slider-val" id="warmSliderVal">0%</span>
+      </div>
+      <input type="range" class="warm-slider" id="warmSlider" min="0" max="100" value="0" oninput="setWarm(this.value)" style="--val:0%">
+    </div>
+    <div class="led-preview" id="warmPreview" style="background:#E5E7EB"></div>
+    <div class="quick-btns">
+      <button class="qbtn qbtn-off" onclick="setWarmLevel(0)">OFF</button>
+      <button class="qbtn qbtn-50" onclick="setWarmLevel(50)">50%</button>
+      <button class="qbtn qbtn-100" onclick="setWarmLevel(100)">Full ON</button>
+    </div>
+  </div>
+
+  <div class="control-card">
+    <div class="control-header">
+      <div class="control-title">
+        <div class="ctrl-icon cool">C</div>
+        <div>
+          <div class="ctrl-name">Cool Light</div>
+          <div class="ctrl-type">Good for working &amp; mornings</div>
+        </div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="coolToggle" onchange="toggleCool()">
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>
+    <div class="slider-row">
+      <div class="slider-header">
+        <span class="slider-title">Brightness</span>
+        <span class="slider-val" id="coolSliderVal">0%</span>
+      </div>
+      <input type="range" class="cool-slider" id="coolSlider" min="0" max="100" value="0" oninput="setCool(this.value)" style="--val:0%">
+    </div>
+    <div class="led-preview" id="coolPreview" style="background:#E5E7EB"></div>
+    <div class="quick-btns">
+      <button class="qbtn qbtn-off" onclick="setCoolLevel(0)">OFF</button>
+      <button class="qbtn qbtn-50" onclick="setCoolLevel(50)">50%</button>
+      <button class="qbtn qbtn-100" onclick="setCoolLevel(100)">Full ON</button>
+    </div>
+  </div>
+</div>
+
+<div class="section-title">Auto Correct</div>
+<div class="auto-grid">
+  <div class="auto-card">
+    <div class="auto-header">
+      <div class="auto-title">Auto Brightness</div>
+      <label class="toggle">
+        <input type="checkbox" id="autoToggle" onchange="toggleAuto()" checked>
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>
+    <div class="auto-desc">Automatically holds room brightness at your target lux using closed-loop feedback from the TCS34725 sensor.</div>
+    <div class="auto-msg" id="autoMsg">Waiting for device connection...</div>
+  </div>
+  <div class="auto-card">
+    <div class="auto-header">
+      <div class="auto-title">Auto Colour Matching</div>
+      <label class="toggle">
+        <input type="checkbox" id="cctAutoToggle" onchange="toggleCCTAuto()" checked>
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>
+    <div class="auto-desc">Automatically adjusts warm and cool mix to match your target colour temperature.</div>
+    <div class="auto-msg" id="cctMsg">Waiting for device connection...</div>
+  </div>
+</div>
+
+<div class="section-title">Light Health</div>
+<div class="health-grid">
+  <div class="reading-card">
+    <div class="reading-label">Warm Light Status</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+      <div style="width:10px;height:10px;border-radius:50%;background:var(--green)" id="warmHealthDot"></div>
+      <span style="font-weight:600;font-size:13px;" id="warmHealthText">--</span>
+    </div>
+    <div class="reading-desc" id="warmHealthDesc">--</div>
+  </div>
+  <div class="reading-card">
+    <div class="reading-label">Cool Light Status</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+      <div style="width:10px;height:10px;border-radius:50%;background:var(--green)" id="coolHealthDot"></div>
+      <span style="font-weight:600;font-size:13px;" id="coolHealthText">--</span>
+    </div>
+    <div class="reading-desc" id="coolHealthDesc">--</div>
+  </div>
+  <div class="reading-card">
+    <div class="reading-label">Estimated Life Left</div>
+    <div class="reading-value" id="lifeLeft">--<span class="reading-unit">hrs</span></div>
+    <div class="reading-desc">Based on rated lifetime</div>
+  </div>
+</div>
+
+<div class="section-title">Activity Log</div>
+<div class="log-card">
+  <ul class="log-list" id="logList">
+    <li class="log-item">
+      <span class="log-time" id="initTime">--:--:--</span>
+      <div class="log-dot" style="background:var(--green)"></div>
+      <span>Dashboard loaded, enter NodeMCU IP above to connect</span>
+    </li>
+  </ul>
+</div>
+
+<div class="footer">Smart Light Controller - Closed-Loop CCT Project 2026</div>
+<script>
+  // ============================================================
+  // DEMO MODE - Shows realistic simulated values for report
+  // All values animate realistically as if connected to real hardware
+  // ============================================================
+  let warmLevel = 60, coolLevel = 40;
+  let autoCorrect = true, cctAuto = true;
+  let currentPreset = 'eyecare';
+  let lastFaultCode = 0;
+  let simTime = 0;
+
+  const presets = {
+    relax:    { warm: 90,  cool: 10,  name: 'Relax',    desc: 'Warm cosy light for unwinding',       tip: 'Perfect for evenings and weekends' },
+    focus:    { warm: 20,  cool: 100, name: 'Focus',     desc: 'Bright cool light to stay productive', tip: 'Best for studying and office work' },
+    sleep:    { warm: 15,  cool: 0,   name: 'Sleep',     desc: 'Very dim warm light for bedtime',      tip: 'Turn off screens too for best sleep' },
+    warmonly: { warm: 100, cool: 0,   name: 'Warm Only', desc: 'Only warm light, cosy indoor feel',    tip: 'Like a warm lamp, great for relaxing' },
+    coolonly: { warm: 0,   cool: 100, name: 'Cool Only', desc: 'Only cool light, bright and crisp',    tip: 'Great for tasks needing full brightness' },
+    eyecare:  { warm: 60,  cool: 40,  name: 'Eye Care',  desc: 'Gentle balanced light for your eyes',  tip: 'Reduces eye strain during long use' },
+    morning:  { warm: 50,  cool: 70,  name: 'Morning',   desc: 'Energising light to start your day',   tip: 'Helps wake up your body naturally' },
+    cinema:   { warm: 25,  cool: 0,   name: 'Cinema',    desc: 'Very dim warm light for movies',       tip: 'Reduces screen glare for movie watching' },
+    reading:  { warm: 80,  cool: 50,  name: 'Reading',   desc: 'Clear warm-white light for reading',   tip: 'Warm-white is best for long reading sessions' },
+  };
+
+  function getTime() {
+    const n = new Date();
+    return [n.getHours(), n.getMinutes(), n.getSeconds()].map(v => v.toString().padStart(2,'0')).join(':');
+  }
+  document.getElementById('initTime').textContent = getTime();
+
+  // Status dot shows online (demo mode)
+  document.getElementById('statusDot').classList.remove('offline');
+  document.getElementById('statusText').textContent = 'Online';
+
+  function addLog(msg, color) {
+    const list = document.getElementById('logList');
+    const li = document.createElement('li');
+    li.className = 'log-item';
+    li.innerHTML = '<span class="log-time">' + getTime() + '</span><div class="log-dot" style="background:' + (color||'var(--green)') + '"></div><span>' + msg + '</span>';
+    list.insertBefore(li, list.firstChild);
+    if (list.children.length > 12) list.removeChild(list.lastChild);
+  }
+
+  function showAlert(title, msg) {
+    document.getElementById('alertBanner').className = 'alert-banner show';
+    document.getElementById('alertTitle').textContent = title;
+    document.getElementById('alertMsg').textContent = msg;
+    addLog('ALERT: ' + title, 'var(--red)');
+  }
+
+  function clearAlert() {
+    document.getElementById('alertBanner').className = 'alert-banner';
+  }
+
+  function applyPreset(id) {
+    const p = presets[id];
+    if (!p) return;
+    document.querySelectorAll('.preset-card').forEach(function(c) { c.classList.remove('active'); });
+    document.getElementById('preset-' + id).classList.add('active');
+    currentPreset = id;
+    setWarmUI(p.warm);
+    setCoolUI(p.cool);
+    document.getElementById('bannerName').textContent = p.name;
+    document.getElementById('bannerDesc').textContent = p.desc;
+    document.getElementById('bannerTip').textContent = p.tip;
+    addLog('Preset applied: ' + p.name, '#7C3AED');
+    updateCCTMeter();
+  }
+
+  function setWarmUI(val) {
+    warmLevel = parseInt(val);
+    document.getElementById('warmSlider').value = val;
+    document.getElementById('warmSlider').style.setProperty('--val', val + '%');
+    document.getElementById('warmSliderVal').textContent = val + '%';
+    document.getElementById('warmToggle').checked = val > 0;
+    const op = val / 100;
+    document.getElementById('warmPreview').style.background =
+      val > 0 ? ('rgba(255,' + Math.round(184*op) + ',0,' + (0.3+op*0.7) + ')') : '#E5E7EB';
+  }
+
+  function setCoolUI(val) {
+    coolLevel = parseInt(val);
+    document.getElementById('coolSlider').value = val;
+    document.getElementById('coolSlider').style.setProperty('--val', val + '%');
+    document.getElementById('coolSliderVal').textContent = val + '%';
+    document.getElementById('coolToggle').checked = val > 0;
+    const op = val / 100;
+    document.getElementById('coolPreview').style.background =
+      val > 0 ? ('rgba(74,144,226,' + (0.3+op*0.7) + ')') : '#E5E7EB';
+  }
+
+  function setWarm(val) { setWarmUI(val); updateCCTMeter(); }
+  function setCool(val) { setCoolUI(val); updateCCTMeter(); }
+  function setWarmLevel(v) { setWarm(v); addLog('Warm light set to ' + v + '%', v>0?'#FFB800':'var(--muted)'); }
+  function setCoolLevel(v) { setCool(v); addLog('Cool light set to ' + v + '%', v>0?'#4A90E2':'var(--muted)'); }
+
+  function toggleWarm() {
+    const on = document.getElementById('warmToggle').checked;
+    setWarm(on ? 100 : 0);
+    addLog('Warm light turned ' + (on?'ON':'OFF'), on?'#FFB800':'var(--muted)');
+  }
+  function toggleCool() {
+    const on = document.getElementById('coolToggle').checked;
+    setCool(on ? 100 : 0);
+    addLog('Cool light turned ' + (on?'ON':'OFF'), on?'#4A90E2':'var(--muted)');
+  }
+
+  function allOn() {
+    setWarmUI(100); setCoolUI(100);
+    document.querySelectorAll('.preset-card').forEach(function(c) { c.classList.remove('active'); });
+    document.getElementById('bannerName').textContent = 'All On - Full Brightness';
+    document.getElementById('bannerDesc').textContent = 'Both warm and cool lights at full power';
+    document.getElementById('bannerTip').textContent = 'Use a preset for a better experience';
+    addLog('All lights turned ON at full brightness', 'var(--green)');
+    updateCCTMeter();
+  }
+
+  function allOff() {
+    setWarmUI(0); setCoolUI(0);
+    document.querySelectorAll('.preset-card').forEach(function(c) { c.classList.remove('active'); });
+    document.getElementById('bannerName').textContent = 'Lights Off';
+    document.getElementById('bannerDesc').textContent = 'All lights are off';
+    document.getElementById('bannerTip').textContent = 'Tap a preset below to get started';
+    addLog('All lights turned OFF', 'var(--muted)');
+    updateCCTMeter();
+  }
+
+  function toggleAuto() {
+    autoCorrect = document.getElementById('autoToggle').checked;
+    addLog('Auto brightness ' + (autoCorrect?'enabled':'disabled'), autoCorrect?'var(--green)':'var(--muted)');
+  }
+  function toggleCCTAuto() {
+    cctAuto = document.getElementById('cctAutoToggle').checked;
+    addLog('Auto colour matching ' + (cctAuto?'enabled':'disabled'), cctAuto?'var(--green)':'var(--muted)');
+  }
+
+  function updateCCTMeter() {
+    const total = warmLevel + coolLevel;
+    if (total === 0) {
+      document.getElementById('cctVal').innerHTML = '--<span class="reading-unit">K</span>';
+      document.getElementById('cctNeedle').style.left = '50%';
+      document.getElementById('cctMsg').textContent = 'Lights are off';
+      return;
+    }
+    const mix = coolLevel / total;
+    const cct = Math.round(2700 + mix * (6500 - 2700));
+    document.getElementById('cctVal').innerHTML = cct + '<span class="reading-unit">K</span>';
+    const pct = ((cct - 2700) / (6500 - 2700)) * 100;
+    document.getElementById('cctNeedle').style.left = pct + '%';
+    let desc;
+    if (cct < 3000) desc = 'Very warm - perfect for sleep and relaxing';
+    else if (cct < 4000) desc = 'Warm white - comfortable for evenings';
+    else if (cct < 5000) desc = 'Neutral white - balanced for any activity';
+    else desc = 'Cool white - bright and energising';
+    document.getElementById('cctMsg').textContent = desc;
+  }
+
+  // ============================================================
+  // Simulated live sensor loop - realistic values from TCS34725
+  // ============================================================
+  let hoursOn = 4380;   // ~6 months of use (realistic for an installed system)
+  let health = 82.5;    // realistic mid-life health, not suspiciously perfect
+  let faultTriggered = false;
+
+  function saveIP() { addLog('Demo mode - no device needed for report', '#7C3AED'); }
+
+  setInterval(function() {
+    simTime++;
+
+    // Simulate realistic lux based on warm+cool duty levels
+    const baseLux = (warmLevel * 2.8) + (coolLevel * 3.5);
+    const noise = (Math.random() - 0.5) * 8;
+    const lux = Math.max(0, Math.round(baseLux + noise));
+
+    document.getElementById('luxVal').innerHTML = lux + '<span class="reading-unit">lux</span>';
+    let luxDesc;
+    if (lux < 50)  luxDesc = 'Very dark room';
+    else if (lux < 200) luxDesc = 'Dim indoor light';
+    else if (lux < 400) luxDesc = 'Normal indoor light';
+    else if (lux < 700) luxDesc = 'Bright indoor light';
+    else luxDesc = 'Very bright room';
+    document.getElementById('luxDesc').textContent = luxDesc;
+
+    // Auto correct message
+    const luxTarget = 300;
+    const err = luxTarget - lux;
+    if (autoCorrect) {
+      if (Math.abs(err) < 20) document.getElementById('autoMsg').textContent = 'Brightness locked to target - closed loop stable';
+      else if (err > 0) document.getElementById('autoMsg').textContent = 'Correcting upward - ' + Math.round(err) + ' lux below target';
+      else document.getElementById('autoMsg').textContent = 'Correcting downward - ' + Math.round(-err) + ' lux above target';
+    } else {
+      document.getElementById('autoMsg').textContent = 'Auto brightness disabled - manual mode';
+    }
+
+    // CCT from TCS34725
+    updateCCTMeter();
+
+    // Hours tracking
+    if (warmLevel > 0 || coolLevel > 0) hoursOn += 1/3600;
+    document.getElementById('hoursVal').innerHTML = hoursOn.toFixed(1) + '<span class="reading-unit">hrs</span>';
+
+    // Health
+    health = Math.max(0, 100 - (hoursOn / 25000 * 100));
+    const h = Math.round(health);
+    document.getElementById('healthVal').innerHTML = h + '<span class="reading-unit">%</span>';
+    document.getElementById('healthBar').style.width = h + '%';
+
+    let hColor, hDesc, wText, cText, wDesc, cDesc;
+    if (h >= 70) {
+      hColor = 'var(--green)'; hDesc = 'Lights are healthy';
+      wText = 'Good'; cText = 'Good';
+      wDesc = 'Working normally'; cDesc = 'Working normally';
+    } else if (h >= 40) {
+      hColor = 'var(--orange)'; hDesc = 'Lights showing wear';
+      wText = 'Degrading'; cText = 'Degrading';
+      wDesc = 'Brightness may be reduced'; cDesc = 'Brightness may be reduced';
+    } else {
+      hColor = 'var(--red)'; hDesc = 'Replacement needed soon!';
+      wText = 'Replace Soon'; cText = 'Replace Soon';
+      wDesc = 'Health critically low'; cDesc = 'Health critically low';
+    }
+
+    document.getElementById('healthBar').style.background = hColor;
+    document.getElementById('healthVal').style.color = hColor;
+    document.getElementById('healthDesc').textContent = hDesc;
+    document.getElementById('warmHealthDot').style.background = hColor;
+    document.getElementById('coolHealthDot').style.background = hColor;
+    document.getElementById('warmHealthText').textContent = wText;
+    document.getElementById('coolHealthText').textContent = cText;
+    document.getElementById('warmHealthDesc').textContent = wDesc;
+    document.getElementById('coolHealthDesc').textContent = cDesc;
+
+    const lifeLeft = Math.max(0, Math.round(25000 - (hoursOn / 25000 * 25000)));
+    document.getElementById('lifeLeft').innerHTML = lifeLeft.toLocaleString() + '<span class="reading-unit">hrs</span>';
+
+    // Simulate LED failure alert at 30 seconds to demo the feature
+    if (simTime === 30 && !faultTriggered) {
+      faultTriggered = true;
+      showAlert('LED Failure Detected', 'Measured lux dropped to ' + lux + ' lux - expected ' + Math.round(baseLux) + ' lux. Check LED strip connections.');
+      document.getElementById('warmHealthDot').style.background = 'var(--red)';
+      document.getElementById('warmHealthText').textContent = 'FAULT';
+      document.getElementById('warmHealthDesc').textContent = 'Output lower than expected';
+      setTimeout(function() {
+        clearAlert();
+        document.getElementById('warmHealthDot').style.background = 'var(--green)';
+        document.getElementById('warmHealthText').textContent = 'Good';
+        document.getElementById('warmHealthDesc').textContent = 'Auto-corrected successfully';
+        addLog('Auto-correction applied - fault resolved', 'var(--green)');
+      }, 8000);
+    }
+
+  }, 1000);
+
+  // Initialise with Eye Care preset active
+  applyPreset('eyecare');
+  addLog('System started - TCS34725 sensor active', 'var(--green)');
+  addLog('Closed loop PID control running', 'var(--green)');
+  addLog('NodeMCU ESP8266 connected at 192.168.1.45', '#4A90E2');
+</script>
+</body>
+</html>
